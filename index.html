@@ -255,6 +255,27 @@
     }
     .beanometer span { margin-right: 0.4rem; }
     .coin-tier { display: inline-block; }
+
+    /* ── Price History chart ── */
+    .layout-history {
+      max-width: 1100px;
+      margin: 0 auto 1.5rem;
+    }
+    .bean-toggle {
+      padding: 0.2rem 0.55rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      font-size: 0.72rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      transition: opacity 0.2s;
+    }
+    .bean-toggle:hover { background: var(--border); }
+    .bean-toggle.hidden { opacity: 0.3; }
+    #price-history-svg { width: 100%; display: block; }
   </style>
 </head>
 <body>
@@ -372,6 +393,18 @@
 
 </div>
 
+<!-- ── Price History ── -->
+<div class="layout-history">
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.75rem; flex-wrap:wrap; gap:0.5rem;">
+      <h2 style="margin:0">📈 Bean Price History</h2>
+      <div id="history-toggles" style="display:flex; flex-wrap:wrap; gap:0.35rem;"></div>
+    </div>
+    <svg id="price-history-svg" viewBox="0 0 900 220"></svg>
+    <p class="chart-note">Click a bean to show/hide it. X-axis = trade number (0 = start); Y-axis = normalised price.</p>
+  </div>
+</div>
+
 <script>
 // ─────────────────────────────────────────────
 //  Bean data  (standard Bohnanza card counts &
@@ -432,6 +465,7 @@ const BASE_VALUES = computeBaseValues();
 let market = { ...BASE_VALUES };   // current prices
 let history = [];                  // recorded trades
 let viewIdx = null;                // null = live; number = snapshot index
+let hiddenBeans = new Set();       // bean ids hidden from the price history chart
 
 // ─────────────────────────────────────────────
 //  Initialise
@@ -449,6 +483,7 @@ function init() {
 
   renderChart();
   renderBeanometer();
+  renderPriceHistory();
   updatePreview();
   updateCompare();
 }
@@ -685,6 +720,7 @@ function recordTrade() {
 
   renderChart();
   renderHistory();
+  renderPriceHistory();
   updatePreview();
   updateCompare();
 
@@ -724,8 +760,111 @@ function clearAll() {
   viewIdx  = null;
   renderChart();
   renderHistory();
+  renderPriceHistory();
   updatePreview();
   updateCompare();
+}
+
+// ─────────────────────────────────────────────
+//  Price History line chart
+// ─────────────────────────────────────────────
+function renderPriceHistory() {
+  const svg      = document.getElementById('price-history-svg');
+  const toggles  = document.getElementById('history-toggles');
+
+  // Rebuild toggle buttons
+  toggles.innerHTML = BEANS.map(b =>
+    `<button class="bean-toggle${hiddenBeans.has(b.id) ? ' hidden' : ''}"
+       onclick="toggleBean('${b.id}')"
+       style="border-color:${b.color}; color:${b.color};">
+       <span style="display:inline-block;width:8px;height:8px;background:${b.color};border-radius:50%;"></span>
+       ${b.name}
+     </button>`
+  ).join('');
+
+  // Build dataset: [BASE_VALUES, snapshot after trade 1, ..., snapshot after trade N]
+  const snaps = [BASE_VALUES, ...history.map(t => t.snapshot)];
+  const n = snaps.length;
+
+  if (n < 2) {
+    svg.innerHTML = `<text x="450" y="120" text-anchor="middle" fill="#8888aa"
+      font-size="14" font-family="Segoe UI,Tahoma,sans-serif">
+      Record a trade to see price history.</text>`;
+    return;
+  }
+
+  // Layout constants (SVG units matching viewBox "0 0 900 220")
+  const PL = 42, PR = 12, PT = 10, PB = 28;
+  const W  = 900 - PL - PR;
+  const H  = 220 - PT - PB;
+
+  // Y extent across all visible beans and all snapshots
+  let yMin = Infinity, yMax = -Infinity;
+  BEANS.forEach(b => {
+    if (hiddenBeans.has(b.id)) return;
+    snaps.forEach(s => {
+      if (s[b.id] < yMin) yMin = s[b.id];
+      if (s[b.id] > yMax) yMax = s[b.id];
+    });
+  });
+  if (!isFinite(yMin)) { yMin = 0; yMax = 2; }     // all hidden
+  const yPad = (yMax - yMin) * 0.08 || 0.1;
+  yMin -= yPad; yMax += yPad;
+
+  const xPos = i  => PL + (i / Math.max(1, n - 1)) * W;
+  const yPos = v  => PT + H - ((v - yMin) / (yMax - yMin)) * H;
+
+  let out = '';
+
+  // Y grid lines & labels
+  const Y_TICKS = 4;
+  for (let i = 0; i <= Y_TICKS; i++) {
+    const v = yMin + (yMax - yMin) * (i / Y_TICKS);
+    const y = yPos(v);
+    out += `<line x1="${PL}" y1="${y.toFixed(1)}" x2="${900 - PR}" y2="${y.toFixed(1)}"
+              stroke="#2a2a4a" stroke-width="1"/>`;
+    out += `<text x="${PL - 4}" y="${(y + 3.5).toFixed(1)}" text-anchor="end"
+              fill="#8888aa" font-size="9" font-family="Segoe UI,Tahoma,sans-serif">
+              ${v.toFixed(2)}</text>`;
+  }
+
+  // X axis labels (trade numbers, spaced to avoid crowding)
+  const maxXLabels = Math.min(n, 12);
+  const xStep = Math.max(1, Math.round((n - 1) / Math.max(1, maxXLabels - 1)));
+  for (let i = 0; i < n; i += xStep) {
+    const x = xPos(i);
+    out += `<text x="${x.toFixed(1)}" y="${220 - PB + 14}" text-anchor="middle"
+              fill="#8888aa" font-size="9" font-family="Segoe UI,Tahoma,sans-serif">
+              ${i === 0 ? '0' : i}</text>`;
+  }
+  // Always label the last point
+  if ((n - 1) % xStep !== 0) {
+    const x = xPos(n - 1);
+    out += `<text x="${x.toFixed(1)}" y="${220 - PB + 14}" text-anchor="middle"
+              fill="#8888aa" font-size="9" font-family="Segoe UI,Tahoma,sans-serif">
+              ${n - 1}</text>`;
+  }
+
+  // One polyline per visible bean
+  BEANS.forEach(b => {
+    if (hiddenBeans.has(b.id)) return;
+    const pts = snaps.map((s, i) =>
+      `${xPos(i).toFixed(1)},${yPos(s[b.id]).toFixed(1)}`
+    ).join(' ');
+    out += `<polyline points="${pts}" fill="none" stroke="${b.color}"
+              stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+  });
+
+  svg.innerHTML = out;
+}
+
+function toggleBean(id) {
+  if (hiddenBeans.has(id)) {
+    hiddenBeans.delete(id);
+  } else {
+    hiddenBeans.add(id);
+  }
+  renderPriceHistory();
 }
 
 // ─────────────────────────────────────────────
