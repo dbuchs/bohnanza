@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bohnanza Bean Market Tracker</title>
+  <style>
+    :root {
+      --bg: #1a1a2e;
+      --surface: #16213e;
+      --surface2: #0f3460;
+      --accent: #e94560;
+      --text: #eaeaea;
+      --muted: #8888aa;
+      --border: #2a2a4a;
+      --fair: #27ae60;
+      --unfair: #e74c3c;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 1rem;
+    }
+
+    header {
+      text-align: center;
+      padding: 1.5rem 1rem 1rem;
+    }
+    header h1 { font-size: 2rem; margin-bottom: 0.25rem; }
+    header p { color: var(--muted); font-size: 0.95rem; }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+      max-width: 1100px;
+      margin: 1rem auto;
+    }
+    .layout-bottom {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+      max-width: 1100px;
+      margin: 0 auto 1.5rem;
+    }
+
+    @media (max-width: 740px) {
+      .layout, .layout-bottom { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+    }
+    .card h2 {
+      font-size: 1.05rem;
+      margin-bottom: 1rem;
+      color: var(--text);
+    }
+
+    /* ── Market bar chart ── */
+    .bean-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.55rem;
+    }
+    .bean-name {
+      width: 128px;
+      font-size: 0.8rem;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      flex-shrink: 0;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .bar-bg {
+      flex: 1;
+      height: 18px;
+      background: var(--border);
+      border-radius: 9px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 9px;
+      transition: width 0.45s ease;
+    }
+    .bean-val {
+      width: 38px;
+      text-align: right;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    .chart-note {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-top: 0.5rem;
+    }
+
+    /* ── Form ── */
+    .form-group { margin-bottom: 0.85rem; }
+    .form-group label {
+      display: block;
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-bottom: 0.25rem;
+    }
+    select, input[type="number"] {
+      width: 100%;
+      padding: 0.45rem 0.6rem;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 0.875rem;
+    }
+    select:focus, input:focus { outline: 2px solid var(--accent); }
+
+    .trade-row {
+      display: grid;
+      grid-template-columns: 80px 1fr;
+      gap: 0.5rem;
+    }
+    .for-sep {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.85rem;
+      padding: 0.3rem 0;
+    }
+
+    .preview-box {
+      background: var(--surface2);
+      border-radius: 8px;
+      padding: 0.55rem 0.75rem;
+      font-size: 0.8rem;
+      min-height: 2.5rem;
+      margin-bottom: 0.85rem;
+      color: var(--muted);
+    }
+    .preview-box .label-fair   { color: var(--fair); font-weight: 600; }
+    .preview-box .label-unfair { color: var(--unfair); font-weight: 600; }
+
+    button.btn-primary {
+      width: 100%;
+      padding: 0.65rem;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    button.btn-primary:hover { opacity: 0.85; }
+
+    button.btn-sm {
+      padding: 0.3rem 0.75rem;
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.78rem;
+      cursor: pointer;
+    }
+    button.btn-sm:hover { background: var(--border); }
+
+    /* ── History ── */
+    .history-scroll {
+      max-height: 280px;
+      overflow-y: auto;
+    }
+    .trade-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.45rem 0.25rem;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.8rem;
+      gap: 0.5rem;
+    }
+    .trade-item:last-child { border-bottom: none; }
+    .trade-item .num { color: var(--muted); min-width: 1.5rem; }
+    .trade-item .desc { flex: 1; }
+    .badge {
+      font-size: 0.7rem;
+      padding: 2px 7px;
+      border-radius: 10px;
+      flex-shrink: 0;
+    }
+    .badge-fair   { background: #27ae6030; color: var(--fair); }
+    .badge-unfair { background: #e74c3c30; color: var(--unfair); }
+
+    .empty-msg {
+      color: var(--muted);
+      font-style: italic;
+      text-align: center;
+      padding: 1.5rem;
+      font-size: 0.85rem;
+    }
+
+    .timeline-wrap {
+      margin-top: 0.75rem;
+      display: none;
+    }
+    .timeline-wrap label {
+      font-size: 0.75rem;
+      color: var(--muted);
+      display: block;
+      margin-bottom: 0.2rem;
+    }
+    input[type="range"] {
+      width: 100%;
+      cursor: pointer;
+    }
+
+    /* ── Compare widget ── */
+    .compare-row {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 0.5rem;
+      align-items: center;
+      margin-bottom: 0.75rem;
+    }
+    .compare-result {
+      background: var(--surface2);
+      border-radius: 8px;
+      padding: 0.75rem;
+      font-size: 0.875rem;
+      text-align: center;
+      min-height: 2.5rem;
+      color: var(--muted);
+    }
+    .compare-result strong { color: var(--text); font-size: 1rem; }
+
+    /* beanometer tooltip area */
+    .beanometer {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-top: 0.3rem;
+    }
+    .beanometer span { margin-right: 0.4rem; }
+    .coin-tier { display: inline-block; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🫘 Bohnanza Bean Market</h1>
+  <p>Track relative bean values by logging every trade in sequence</p>
+</header>
+
+<div class="layout">
+
+  <!-- ── Market Chart ── -->
+  <div class="card">
+    <h2>📊 Current Market Values</h2>
+    <div id="bean-chart"></div>
+    <p class="chart-note">Values normalised so the average bean = 1.00. Updated after each recorded trade.</p>
+  </div>
+
+  <!-- ── Trade Input ── -->
+  <div class="card">
+    <h2>🤝 Record a Trade</h2>
+
+    <div class="form-group">
+      <label for="trade-type">Trade Type</label>
+      <select id="trade-type" onchange="onTradeTypeChange()">
+        <option value="bean-for-bean">Bean for Bean</option>
+        <option value="first-dibs">Beans for First Dibs (next 2 cards)</option>
+      </select>
+    </div>
+
+    <!-- Bean-for-bean fields -->
+    <div id="bfb-section">
+      <div class="form-group">
+        <label>Offered</label>
+        <div class="trade-row">
+          <input type="number" id="qty-a" min="1" max="99" value="1" oninput="updatePreview()">
+          <select id="bean-a" onchange="updatePreview()"></select>
+        </div>
+      </div>
+      <div class="for-sep">for</div>
+      <div class="form-group">
+        <label>Received</label>
+        <div class="trade-row">
+          <input type="number" id="qty-b" min="1" max="99" value="1" oninput="updatePreview()">
+          <select id="bean-b" onchange="updatePreview()"></select>
+        </div>
+      </div>
+    </div>
+
+    <!-- First-dibs fields -->
+    <div id="dibs-section" style="display:none">
+      <div class="form-group">
+        <label>Offering (in exchange for first dibs on next 2 cards)</label>
+        <div class="trade-row">
+          <input type="number" id="dibs-qty" min="1" max="99" value="1" oninput="updatePreview()">
+          <select id="dibs-bean" onchange="updatePreview()"></select>
+        </div>
+      </div>
+      <p style="font-size:0.78rem; color:var(--muted); margin-bottom:0.6rem;">
+        "First dibs" = right to inspect and take one of the next 2 cards drawn by another player.
+      </p>
+    </div>
+
+    <div class="preview-box" id="trade-preview">Select options above to see a fairness estimate.</div>
+
+    <button class="btn-primary" onclick="recordTrade()">Record Trade ↵</button>
+  </div>
+
+</div>
+
+<div class="layout-bottom">
+
+  <!-- ── Trade History ── -->
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.9rem;">
+      <h2 style="margin:0">📜 Trade History</h2>
+      <button class="btn-sm" onclick="clearAll()">Clear All</button>
+    </div>
+
+    <div class="history-scroll" id="history-list">
+      <p class="empty-msg">No trades recorded yet.</p>
+    </div>
+
+    <div class="timeline-wrap" id="timeline-wrap">
+      <label>Viewing market after trade <strong id="tl-label">—</strong> of <span id="tl-max">—</span></label>
+      <input type="range" id="tl-slider" min="0" max="0" value="0" oninput="onSlider(this.value)">
+    </div>
+  </div>
+
+  <!-- ── Bean Comparison ── -->
+  <div class="card">
+    <h2>🔄 Compare Two Beans</h2>
+    <p style="font-size:0.78rem; color:var(--muted); margin-bottom:0.75rem;">
+      See how many of one bean equals some quantity of another at current market prices.
+    </p>
+    <div class="compare-row">
+      <div>
+        <div class="trade-row" style="margin-bottom:0.4rem;">
+          <input type="number" id="cmp-qty-a" min="1" max="99" value="1" oninput="updateCompare()">
+          <select id="cmp-a" onchange="updateCompare()"></select>
+        </div>
+      </div>
+      <div style="text-align:center; color:var(--muted);">=</div>
+      <div>
+        <select id="cmp-b" onchange="updateCompare()"></select>
+      </div>
+    </div>
+    <div class="compare-result" id="compare-result">Select beans above.</div>
+
+    <div style="margin-top:1rem;">
+      <h2>📋 Beanometer Reference</h2>
+      <div id="beanometer-list" style="margin-top:0.5rem;"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+//  Bean data  (standard Bohnanza card counts &
+//  beanometer = [beans needed for 1,2,3,4 coins])
+// ─────────────────────────────────────────────
+const BEANS = [
+  { id:'wax',       name:'Wax Bean',         cards:22, beanometer:[2,3,4,5],   color:'#F5CBA7' },
+  { id:'blue',      name:'Blue Bean',         cards:20, beanometer:[4,6,8,10],  color:'#5DADE2' },
+  { id:'kidney',    name:'Kidney Bean',       cards:18, beanometer:[2,3,4,5],   color:'#A04040' },
+  { id:'chili',     name:'Chili Bean',        cards:18, beanometer:[3,5,6,7],   color:'#E74C3C' },
+  { id:'stink',     name:'Stink Bean',        cards:16, beanometer:[3,5,7,8],   color:'#A9A900' },
+  { id:'green',     name:'Green Bean',        cards:14, beanometer:[3,5,6,7],   color:'#2ECC71' },
+  { id:'soy',       name:'Soy Bean',          cards:12, beanometer:[2,3,4,6],   color:'#F0B27A' },
+  { id:'blackeyed', name:'Black-Eyed Bean',   cards:10, beanometer:[2,4,5,6],   color:'#BDC3C7' },
+  { id:'red',       name:'Red Bean',          cards: 8, beanometer:[2,3,4,5],   color:'#C0392B' },
+  { id:'garden',    name:'Garden Bean',       cards: 6, beanometer:[2,3],       color:'#1ABC9C' },
+  { id:'cocoa',     name:'Cocoa Bean',        cards: 4, beanometer:[4,6],       color:'#8D5524' },
+];
+
+// ─────────────────────────────────────────────
+//  Named constants
+// ─────────────────────────────────────────────
+
+// Weight applied to each new trade when blending the market ratio.
+// 0.3 means each trade moves the price 30% toward the implied ratio.
+const TRADE_BLEND_ALPHA = 0.3;
+
+// Lower weight for "first dibs" trades: the dibs value is an estimate,
+// so we move prices more gently than for concrete bean-for-bean swaps.
+const DIBS_BLEND_ALPHA = 0.15;
+
+// "First dibs on the next 2 cards" lets the buyer take the better of 2
+// random draws, worth roughly 1.25× a single average-value card.
+const FIRST_DIBS_MULTIPLIER = 1.25;
+
+// Fraction deviation below which a bean-for-bean trade is labelled "Fair".
+const BEAN_FAIRNESS_THRESHOLD = 0.25;
+
+// First-dibs estimates carry more uncertainty, so a wider band is fair.
+const DIBS_FAIRNESS_THRESHOLD = 0.30;
+
+// ─────────────────────────────────────────────
+//  Base value = (1 / beanometer[0]) * (1 / cards)
+//  = harvest efficiency (coins per bean at the 1-coin threshold)
+//    × rarity factor (fewer cards in deck → higher value per card)
+//  Normalised so the mean across all beans = 1.0
+// ─────────────────────────────────────────────
+function computeBaseValues() {
+  const raw = BEANS.map(b => (1 / b.beanometer[0]) / b.cards);
+  const avg = raw.reduce((s, v) => s + v, 0) / raw.length;
+  return Object.fromEntries(BEANS.map((b, i) => [b.id, raw[i] / avg]));
+}
+const BASE_VALUES = computeBaseValues();
+
+// ─────────────────────────────────────────────
+//  State
+// ─────────────────────────────────────────────
+let market = { ...BASE_VALUES };   // current prices
+let history = [];                  // recorded trades
+let viewIdx = null;                // null = live; number = snapshot index
+
+// ─────────────────────────────────────────────
+//  Initialise
+// ─────────────────────────────────────────────
+function init() {
+  const ids = ['bean-a','bean-b','dibs-bean','cmp-a','cmp-b'];
+  ids.forEach(id => {
+    const sel = document.getElementById(id);
+    sel.innerHTML = BEANS.map(b =>
+      `<option value="${b.id}">${b.name}</option>`
+    ).join('');
+  });
+  document.getElementById('bean-b').selectedIndex = 1;
+  document.getElementById('cmp-b').selectedIndex  = 1;
+
+  renderChart();
+  renderBeanometer();
+  updatePreview();
+  updateCompare();
+}
+
+// ─────────────────────────────────────────────
+//  Rendering
+// ─────────────────────────────────────────────
+function renderChart() {
+  const maxVal = Math.max(...Object.values(market));
+  const sorted = [...BEANS].sort((a, b) => market[b.id] - market[a.id]);
+  document.getElementById('bean-chart').innerHTML = sorted.map(bean => {
+    const val = market[bean.id];
+    const pct = (val / maxVal * 100).toFixed(1);
+    return `
+      <div class="bean-row">
+        <div class="bean-name">
+          <div class="dot" style="background:${bean.color}"></div>
+          <span>${bean.name}</span>
+        </div>
+        <div class="bar-bg">
+          <div class="bar-fill" style="width:${pct}%;background:${bean.color}"></div>
+        </div>
+        <div class="bean-val" style="color:${bean.color}">${val.toFixed(2)}</div>
+      </div>`;
+  }).join('');
+}
+
+function renderBeanometer() {
+  const list = document.getElementById('beanometer-list');
+  list.innerHTML = BEANS.map(b => {
+    const tiers = b.beanometer.map((n, i) =>
+      `<span class="coin-tier">${n}→${i+1}¢</span>`
+    ).join(' ');
+    return `
+      <div class="bean-row" style="margin-bottom:0.35rem;">
+        <div class="bean-name">
+          <div class="dot" style="background:${b.color}"></div>
+          <span>${b.name}</span>
+        </div>
+        <div class="beanometer">${tiers}</div>
+      </div>`;
+  }).join('');
+}
+
+function renderHistory() {
+  const el = document.getElementById('history-list');
+  if (history.length === 0) {
+    el.innerHTML = '<p class="empty-msg">No trades recorded yet.</p>';
+    document.getElementById('timeline-wrap').style.display = 'none';
+    return;
+  }
+  el.innerHTML = history.map((t, i) => {
+    const fair = t.type === 'first-dibs'
+      ? t.fairness < DIBS_FAIRNESS_THRESHOLD
+      : t.fairness < BEAN_FAIRNESS_THRESHOLD;
+    const pct  = (t.fairness * 100).toFixed(0);
+    const badge = fair
+      ? `<span class="badge badge-fair">Fair</span>`
+      : `<span class="badge badge-unfair">${pct}% off</span>`;
+    return `
+      <div class="trade-item">
+        <span class="num">${i+1}.</span>
+        <span class="desc">${t.desc}</span>
+        ${badge}
+      </div>`;
+  }).join('');
+  el.scrollTop = el.scrollHeight;
+
+  const wrap   = document.getElementById('timeline-wrap');
+  const slider = document.getElementById('tl-slider');
+  wrap.style.display = '';
+  slider.max   = history.length;
+  if (viewIdx === null) {
+    slider.value = history.length;
+    setTlLabel(history.length);
+  }
+}
+
+function setTlLabel(v) {
+  document.getElementById('tl-label').textContent = v === 0 ? 'start' : v;
+  document.getElementById('tl-max').textContent   = history.length;
+}
+
+// ─────────────────────────────────────────────
+//  Trade form helpers
+// ─────────────────────────────────────────────
+function onTradeTypeChange() {
+  const t = document.getElementById('trade-type').value;
+  document.getElementById('bfb-section').style.display   = t === 'bean-for-bean' ? '' : 'none';
+  document.getElementById('dibs-section').style.display  = t === 'first-dibs'    ? '' : 'none';
+  updatePreview();
+}
+
+// Parse a quantity input, defaulting to 1 for empty / invalid values.
+function parseQuantity(elementId) {
+  return Math.max(1, parseInt(document.getElementById(elementId).value) || 1);
+}
+
+function avgMarketValue() {
+  return Object.values(market).reduce((s,v) => s+v, 0) / BEANS.length;
+}
+
+// "First dibs on the next 2 cards" lets the buyer take the better of 2 draws.
+// Estimated as FIRST_DIBS_MULTIPLIER × the average current market value.
+function dibsValue() {
+  return avgMarketValue() * FIRST_DIBS_MULTIPLIER;
+}
+
+function fairness(valGiven, valReceived) {
+  return Math.abs(valGiven - valReceived) / Math.max(valGiven, valReceived);
+}
+
+function updatePreview() {
+  const box  = document.getElementById('trade-preview');
+  const type = document.getElementById('trade-type').value;
+
+  if (type === 'bean-for-bean') {
+    const qA  = parseQuantity('qty-a');
+    const qB  = parseQuantity('qty-b');
+    const idA = document.getElementById('bean-a').value;
+    const idB = document.getElementById('bean-b').value;
+    const vA  = qA * market[idA];
+    const vB  = qB * market[idB];
+    const f   = fairness(vA, vB);
+    const bA  = BEANS.find(b => b.id === idA).name;
+    const bB  = BEANS.find(b => b.id === idB).name;
+    const cls = f < BEAN_FAIRNESS_THRESHOLD ? 'label-fair' : 'label-unfair';
+    const msg = f < BEAN_FAIRNESS_THRESHOLD
+      ? '✅ Roughly fair'
+      : (vA > vB
+          ? `⚠️ Offered beans are ${(f*100).toFixed(0)}% overvalued`
+          : `⚠️ Offered beans are ${(f*100).toFixed(0)}% undervalued`);
+    box.innerHTML = `${qA}× ${bA} (≈${vA.toFixed(2)}) &harr; ${qB}× ${bB} (≈${vB.toFixed(2)})<br>
+      <span class="${cls}">${msg}</span>`;
+  } else {
+    const qty  = parseQuantity('dibs-qty');
+    const id   = document.getElementById('dibs-bean').value;
+    const bean = BEANS.find(b => b.id === id).name;
+    const vOff = qty * market[id];
+    const vDib = dibsValue();
+    const f    = fairness(vOff, vDib);
+    const cls  = f < DIBS_FAIRNESS_THRESHOLD ? 'label-fair' : 'label-unfair';
+    const msg  = f < DIBS_FAIRNESS_THRESHOLD
+      ? '✅ Reasonable offer for first dibs'
+      : (vOff > vDib
+          ? `⚠️ Generous offer (beans worth ${(f*100).toFixed(0)}% more than est. dibs value)`
+          : `⚠️ Low offer (beans worth ${(f*100).toFixed(0)}% less than est. dibs value)`);
+    box.innerHTML = `${qty}× ${bean} (≈${vOff.toFixed(2)}) &harr; First Dibs (est. ≈${vDib.toFixed(2)})<br>
+      <span class="${cls}">${msg}</span>`;
+  }
+}
+
+function updateCompare() {
+  const qty  = parseQuantity('cmp-qty-a');
+  const idA  = document.getElementById('cmp-a').value;
+  const idB  = document.getElementById('cmp-b').value;
+  const el   = document.getElementById('compare-result');
+
+  if (idA === idB) {
+    el.innerHTML = `${qty} ${BEANS.find(b=>b.id===idA).name} = <strong>${qty}</strong> ${BEANS.find(b=>b.id===idB).name}`;
+    return;
+  }
+  const ratio  = market[idA] / market[idB];
+  const equiv  = (qty * ratio).toFixed(2);
+  const beanA  = BEANS.find(b => b.id === idA).name;
+  const beanB  = BEANS.find(b => b.id === idB).name;
+  el.innerHTML = `${qty} ${beanA} ≈ <strong>${equiv}</strong> ${beanB}`;
+}
+
+// ─────────────────────────────────────────────
+//  Market update (weighted blend toward trade ratio)
+// ─────────────────────────────────────────────
+function applyTrade(idA, qA, idB, qB) {
+  // Trade: qA of A for qB of B  →  value(A)/value(B) ≈ qB/qA
+  const currentRatio = market[idA] / market[idB];
+  const tradeRatio   = qB / qA;
+  const newRatio     = currentRatio * Math.pow(tradeRatio / currentRatio, TRADE_BLEND_ALPHA);
+  const geo          = Math.sqrt(market[idA] * market[idB]);
+  market[idA] = geo * Math.sqrt(newRatio);
+  market[idB] = geo / Math.sqrt(newRatio);
+}
+
+// ─────────────────────────────────────────────
+//  Record trade
+// ─────────────────────────────────────────────
+function recordTrade() {
+  const type = document.getElementById('trade-type').value;
+  viewIdx    = null;   // return to live view
+
+  if (type === 'bean-for-bean') {
+    const qA  = parseQuantity('qty-a');
+    const qB  = parseQuantity('qty-b');
+    const idA = document.getElementById('bean-a').value;
+    const idB = document.getElementById('bean-b').value;
+
+    if (idA === idB) { alert('Both sides must be different bean types.'); return; }
+
+    const vA = qA * market[idA];
+    const vB = qB * market[idB];
+    const f  = fairness(vA, vB);
+    const bA = BEANS.find(b => b.id === idA).name;
+    const bB = BEANS.find(b => b.id === idB).name;
+
+    applyTrade(idA, qA, idB, qB);
+
+    history.push({
+      type: 'bean-for-bean',
+      desc: `${qA}× ${bA}  →  ${qB}× ${bB}`,
+      fairness: f,
+      snapshot: { ...market },
+    });
+
+  } else {
+    const qty  = parseQuantity('dibs-qty');
+    const id   = document.getElementById('dibs-bean').value;
+    const bean = BEANS.find(b => b.id === id).name;
+    const vOff = qty * market[id];
+    const vDib = dibsValue();
+    const f    = fairness(vOff, vDib);
+
+    // Gently adjust the offered bean's price toward the implied per-bean value.
+    // Uses DIBS_BLEND_ALPHA (< TRADE_BLEND_ALPHA) because the dibs value is an
+    // estimate, not an observed bean-for-bean exchange rate.
+    const impliedPricePerBean = vDib / qty;
+    market[id] = market[id] * Math.pow(impliedPricePerBean / market[id], DIBS_BLEND_ALPHA);
+
+    history.push({
+      type: 'first-dibs',
+      desc: `${qty}× ${bean}  →  First Dibs (next 2 cards)`,
+      fairness: f,
+      snapshot: { ...market },
+    });
+  }
+
+  renderChart();
+  renderHistory();
+  updatePreview();
+  updateCompare();
+
+  // Advance timeline slider
+  const slider = document.getElementById('tl-slider');
+  slider.max   = history.length;
+  slider.value = history.length;
+  setTlLabel(history.length);
+}
+
+// ─────────────────────────────────────────────
+//  Timeline slider
+// ─────────────────────────────────────────────
+function onSlider(val) {
+  const v = parseInt(val);
+  setTlLabel(v);
+  if (v === 0) {
+    market  = { ...BASE_VALUES };
+    viewIdx = 0;
+  } else {
+    market  = { ...history[v - 1].snapshot };
+    viewIdx = v;
+  }
+  renderChart();
+  updateCompare();
+  updatePreview();
+}
+
+// ─────────────────────────────────────────────
+//  Clear all
+// ─────────────────────────────────────────────
+function clearAll() {
+  if (history.length === 0) return;
+  if (!confirm('Reset all trades and return market to base values?')) return;
+  history  = [];
+  market   = { ...BASE_VALUES };
+  viewIdx  = null;
+  renderChart();
+  renderHistory();
+  updatePreview();
+  updateCompare();
+}
+
+// ─────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
